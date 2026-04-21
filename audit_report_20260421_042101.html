@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux Security Audit — runsc — 2026-04-21 04:19:46</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --surface2: #263148;
+    --border: #334155; --text: #e2e8f0; --muted: #94a3b8;
+    --font: 'Segoe UI', system-ui, sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.6; }
+  
+  /* ── Header ── */
+  .header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 60%, #1a0a2e 100%);
+             border-bottom: 1px solid var(--border); padding: 32px 40px; }
+  .header-top { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
+  .logo { font-size: 32px; }
+  .header h1 { font-size: 22px; font-weight: 700; color: #f8fafc; }
+  .header-meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .header-meta span { margin-right: 24px; }
+  .overall-badge { display: inline-flex; align-items: center; gap: 8px;
+                    padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 600;
+                    background: #ef444420; color: #ef4444; border: 1px solid #ef444440;
+                    margin-top: 12px; }
+
+  /* ── Layout ── */
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+  
+  /* ── System Info Bar ── */
+  .sysbar { background: var(--surface); border-bottom: 1px solid var(--border);
+             padding: 12px 40px; display: flex; gap: 32px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .sysbar strong { color: var(--text); }
+
+  /* ── Stat Cards ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 24px 0 8px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+                padding: 18px; display: flex; gap: 14px; align-items: center;
+                transition: transform .15s; }
+  .stat-card:hover { transform: translateY(-2px); }
+  .stat-icon { width: 46px; height: 46px; border-radius: 10px; display: flex;
+                align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .stat-value { font-size: 26px; font-weight: 800; line-height: 1; }
+  .stat-title { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: .5px; }
+  .stat-sub   { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+  /* ── Sections ── */
+  .section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+              padding: 24px; margin: 20px 0; }
+  .section-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .section-icon { font-size: 18px; }
+  .section-desc { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+  .section-summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+
+  .sub-heading { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase;
+                  letter-spacing: .5px; margin: 18px 0 8px; }
+
+  /* ── Pills / Tags ── */
+  .summary-pill { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill-red    { background: #ef444420; color: #ef4444; border: 1px solid #ef444440; }
+  .pill-green  { background: #22c55e20; color: #22c55e; border: 1px solid #22c55e40; }
+  .pill-blue   { background: #3b82f620; color: #3b82f6; border: 1px solid #3b82f640; }
+  .pill-orange { background: #f9731620; color: #f97316; border: 1px solid #f9731640; }
+  .pill-gray   { background: #64748b20; color: #94a3b8; border: 1px solid #64748b40; }
+
+  .badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; color: #fff; }
+  .tag   { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; margin: 1px; }
+  .tag-red    { background: #ef444425; color: #f87171; border: 1px solid #ef444440; }
+  .tag-orange { background: #f9731625; color: #fb923c; border: 1px solid #f9731640; }
+  .tag-green  { background: #22c55e25; color: #4ade80; border: 1px solid #22c55e40; }
+  .tag-blue   { background: #3b82f625; color: #60a5fa; border: 1px solid #3b82f640; }
+  .tag-gray   { background: #64748b25; color: #94a3b8; border: 1px solid #64748b40; }
+
+  /* ── Tables ── */
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: #1a2744; }
+  th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
+        border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 9px 14px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1a2744; }
+  .row-high td { background: #ef444408; }
+  .row-high:hover td { background: #ef444415; }
+  .empty { text-align: center; color: var(--muted); padding: 24px !important; }
+  .mono  { font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 12px; }
+  .small { font-size: 11px; }
+  .truncate-cell { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .truncate-note { color: #f59e0b; font-size: 12px; margin-top: 10px; }
+
+  /* ── Bar ── */
+  .bar-wrap { background: #1e293b; border-radius: 4px; height: 6px; width: 100px; overflow: hidden; }
+  .bar { height: 100%; background: #3b82f6; border-radius: 4px; }
+
+  /* ── Two Col ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 8px; }
+
+  /* ── Warn Box ── */
+  .warn-box { background: #f59e0b15; border: 1px solid #f59e0b40; border-radius: 8px;
+               padding: 12px 16px; color: #fcd34d; font-size: 13px; margin-bottom: 14px; }
+  .warn-box code { background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+
+  /* ── Log Box ── */
+  .log-box { background: #0f172a; border: 1px solid var(--border); border-radius: 8px;
+              padding: 12px; font-family: monospace; font-size: 11px; color: #94a3b8;
+              max-height: 200px; overflow-y: auto; }
+  .log-line { padding: 1px 0; border-bottom: 1px solid #1e293b30; }
+
+  /* ── Footer ── */
+  .footer { text-align: center; color: #475569; font-size: 12px; padding: 32px 0 48px; }
+
+  code { background: #1e293b; padding: 1px 5px; border-radius: 3px; font-size: 12px; color: #7dd3fc; }
+
+  @media (max-width: 768px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .two-col { grid-template-columns: 1fr; }
+    .header, .sysbar { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="container">
+    <div class="header-top">
+      <span class="logo">🛡️</span>
+      <div>
+        <h1>Linux System Security Audit</h1>
+        <div class="header-meta">
+          <span>🖥 runsc</span>
+          <span>🕐 2026-04-21 04:19:46</span>
+          <span>⚙ Linux 4.4.0</span>
+        </div>
+      </div>
+    </div>
+    <div class="overall-badge">Overall Risk: Critical</div>
+  </div>
+</div>
+
+<div class="sysbar">
+  <span>Kernel: <strong>Linux 4.4.0</strong></span>
+  <span>Arch: <strong>x86_64</strong></span>
+  <span>Uptime: <strong>up 3 minutes</strong></span>
+  <span>Active Sessions: <strong>0</strong></span>
+  <span>Python: <strong>3.12.3</strong></span>
+</div>
+
+<div class="container">
+  <div class="stats-grid">
+    
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#ef444420;color:#ef4444">🔑</div>
+        <div class="stat-body">
+            <div class="stat-value" style="color:#ef4444">14</div>
+            <div class="stat-title">Suspicious SUID Bins</div>
+            <div class="stat-sub">28 total found</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#f9731620;color:#f97316">📂</div>
+        <div class="stat-body">
+            <div class="stat-value" style="color:#f97316">9118</div>
+            <div class="stat-title">World-Writable (No Sticky)</div>
+            <div class="stat-sub">9118 total found</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#3b82f620;color:#3b82f6">🔐</div>
+        <div class="stat-body">
+            <div class="stat-value" style="color:#3b82f6">0</div>
+            <div class="stat-title">Failed Logins</div>
+            <div class="stat-sub">0 unique IPs</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon" style="background:#8b5cf620;color:#8b5cf6">🚨</div>
+        <div class="stat-body">
+            <div class="stat-value" style="color:#8b5cf6">0</div>
+            <div class="stat-title">Brute-Force IPs</div>
+            <div class="stat-sub">≥5 attempts each</div>
+        </div>
+    </div>
+  </div>
+
+  
+    <section class="section">
+        <h2 class="section-title">
+            <span class="section-icon">🔑</span> SUID / SGID Binaries
+        </h2>
+        <div class="section-summary">
+            <div class="summary-pill pill-red">⚠ 14 Suspicious</div>
+            <div class="summary-pill pill-green">✓ 14 Known Safe</div>
+            <div class="summary-pill pill-blue">∑ 28 Total Found</div>
+        </div>
+        <p class="section-desc">
+            SUID binaries run with the file owner's privileges (typically root).
+            Unexpected SUID binaries can be exploited for privilege escalation.
+        </p>
+        <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th>Path</th><th>Flags</th><th>Permissions</th><th>Owner:Group</th><th>Risk</th>
+            </tr></thead>
+            <tbody>
+        <tr class='row-high'>
+            <td class="mono">/bin/chage</td>
+            <td><span class="tag tag-orange">SGID</span></td>
+            <td class="mono">2755</td>
+            <td class="mono">0:42</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/bin/chfn</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/bin/chsh</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/bin/expiry</td>
+            <td><span class="tag tag-orange">SGID</span></td>
+            <td class="mono">2755</td>
+            <td class="mono">0:42</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/bin/fusermount3</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/bin/gpasswd</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/bin/newgrp</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/bin/passwd</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/sbin/pam_extrausers_chkpwd</td>
+            <td><span class="tag tag-orange">SGID</span></td>
+            <td class="mono">2755</td>
+            <td class="mono">0:42</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/sbin/unix_chkpwd</td>
+            <td><span class="tag tag-orange">SGID</span></td>
+            <td class="mono">2755</td>
+            <td class="mono">0:42</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/usr/bin/chage</td>
+            <td><span class="tag tag-orange">SGID</span></td>
+            <td class="mono">2755</td>
+            <td class="mono">0:42</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/usr/bin/expiry</td>
+            <td><span class="tag tag-orange">SGID</span></td>
+            <td class="mono">2755</td>
+            <td class="mono">0:42</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/usr/lib/polkit-1/polkit-agent-helper-1</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/usr/sbin/pam_extrausers_chkpwd</td>
+            <td><span class="tag tag-orange">SGID</span></td>
+            <td class="mono">2755</td>
+            <td class="mono">0:42</td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/bin/mount</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/bin/su</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/bin/umount</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/usr/bin/chfn</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/usr/bin/chsh</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/usr/bin/fusermount3</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/usr/bin/gpasswd</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/usr/bin/mount</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/usr/bin/newgrp</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/usr/bin/passwd</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/usr/bin/su</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/usr/bin/umount</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4755</td>
+            <td class="mono">0:0</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/usr/lib/dbus-1.0/dbus-daemon-launch-helper</td>
+            <td><span class="tag tag-red">SUID</span></td>
+            <td class="mono">4754</td>
+            <td class="mono">0:101</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr>
+        <tr class=''>
+            <td class="mono">/usr/sbin/unix_chkpwd</td>
+            <td><span class="tag tag-orange">SGID</span></td>
+            <td class="mono">2755</td>
+            <td class="mono">0:42</td>
+            <td><span class="badge" style="background:#22c55e">Low</span></td>
+        </tr></tbody>
+        </table>
+        </div>
+        
+    </section>
+  
+    <section class="section">
+        <h2 class="section-title">
+            <span class="section-icon">📂</span> World-Writable Files &amp; Directories
+        </h2>
+        <div class="section-summary">
+            <div class="summary-pill pill-red">⚠ 9118 No Sticky Bit</div>
+            <div class="summary-pill pill-green">✓ 0 Sticky Bit Set</div>
+            <div class="summary-pill pill-blue">∑ 9118 Total Found</div>
+        </div>
+        <p class="section-desc">
+            World-writable files can be modified by any user. Without a sticky bit,
+            directories like <code>/tmp</code> allow anyone to delete others' files.
+        </p>
+        <div class="table-wrap">
+        <table>
+            <thead><tr>
+                <th>Path</th><th>Type</th><th>Permissions</th><th>Sticky Bit</th><th>Risk</th>
+            </tr></thead>
+            <tbody>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/animate</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/animate-im6</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/awk</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/bibtex</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/c++</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/c89</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/c99</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/cc</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/compare</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/compare-im6</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/composite</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/composite-im6</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/conjure</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/conjure-im6</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/convert</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/convert-im6</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/cpp</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/default-GM.sf2</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/default-GM.sf3</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/display</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/display-im6</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/fonts-japanese-gothic.ttf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/identify</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/identify-im6</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/import</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/import-im6</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/java</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/java.1.gz</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/jexec</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/jexec-binfmt</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/jpackage</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/jpackage.1.gz</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/keytool</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/keytool.1.gz</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/libblas.so.3-x86_64-linux-gnu</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/liblapack.so.3-x86_64-linux-gnu</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/lzcat</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/lzcmp</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/lzdiff</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/lzegrep</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/lzfgrep</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/lzgrep</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/lzless</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/lzma</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/lzmore</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/mogrify</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/mogrify-im6</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/montage</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/montage-im6</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/nawk</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/nc</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/netcat</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/nodejs</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/open</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/pager</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/pdftk</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/pinentry</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/rmiregistry</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/rmiregistry.1.gz</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/rmt</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/stream</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/stream-im6</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/unlzma</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/which</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/x-cursor-theme</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/alternatives/xdvi.bin</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/default/locale</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/dpkg/origins/default</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/10-hinting-slight.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/10-scale-bitmap-fonts.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/10-sub-pixel-rgb.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/10-yes-antialias.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/11-lcdfilter-default.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/20-unhint-small-dejavu-lgc-sans-mono.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/20-unhint-small-dejavu-lgc-sans.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/20-unhint-small-dejavu-lgc-serif.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/20-unhint-small-dejavu-sans-mono.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/20-unhint-small-dejavu-sans.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/20-unhint-small-dejavu-serif.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/20-unhint-small-vera.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/25-wqy-zenhei.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/30-metric-aliases.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/30-opensymbol.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/40-nonlatin.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/45-generic.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/45-latin.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/48-spacing.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/49-sansserif.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/50-user.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/51-local.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/57-dejavu-sans-mono.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/57-dejavu-sans.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/57-dejavu-serif.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/58-dejavu-lgc-sans-mono.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/58-dejavu-lgc-sans.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/58-dejavu-lgc-serif.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/60-generic.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/60-latin.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/64-wqy-zenhei.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/65-fonts-ipafont-gothic.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/65-fonts-lmodern.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/65-fonts-persian.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/65-fonts-texgyre.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/65-nonlatin.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/69-unifont.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/70-fonts-noto-cjk.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/70-no-bitmaps-except-emoji.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/80-delicious.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/fonts/conf.d/90-synthetic.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/libreoffice/registry/oo-ad-ldap.xcd.sample</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/libreoffice/registry/oo-ldap.xcd.sample</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/localtime</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/modules-load.d/modules.conf</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/mtab</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/os-release</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/rc2.d/S01dbus</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/rc3.d/S01dbus</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/rc4.d/S01dbus</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/rc5.d/S01dbus</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/rcS.d/S01procps</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/rcS.d/S01x11-common</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/rmt</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/sgml/catalog</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/002c0b4f.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/011d5696.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/0179095f.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/02265526.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/062cdee6.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/064e0aa9.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/06dc52d5.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/08063a00.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/09789157.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/0a775a30.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/0b1b94ef.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/0b9bc432.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/0bf05006.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/0f5dc4f3.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/0f6fa695.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/1001acf7.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/106f3e4d.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/14bc7599.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/18856ac4.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/1a2ed160.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/1cef98f5.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/1d3472b9.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/1e08bfd1.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/1e09d511.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/228f89db.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/244b5494.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/2923b3f9.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/2ae6433e.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/2b349938.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/32888f65.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/3513523f.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/3bde41ac.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/3e359ba6.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/3fb36b73.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/40193066.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/4042bcee.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/40547a79.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/406c9bb1.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/48bec511.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/4b718d9b.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/4bfab552.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/4f316efb.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/4fd49c6c.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/5443e9e3.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/54657681.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/57bcb2da.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/5860aaa6.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/5931b5bc.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/5ad8a5d6.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/5cd81ad7.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/5e98733a.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/5f15c80c.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/5f618aec.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/607986c7.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/626dceaf.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/653b494a.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/68dd7389.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/6b99d060.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/6d41d539.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/6fa5da56.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/706f604c.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/749e9e03.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/75d1b2ed.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/76faf6c0.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/7719f463.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/773e07ad.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/7a3adc42.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/7a780d93.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/7e915145.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/7f3d5d1d.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/8160b96c.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/81f2d2b1.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/8312c4c1.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/8508e720.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/865fbdf9.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/8cb5ee0f.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr>
+        <tr class='row-high'>
+            <td class="mono">/etc/ssl/certs/8d86cdd1.0</td>
+            <td><span class="tag tag-gray">File</span></td>
+            <td class="mono">0777</td>
+            <td><span class='tag tag-red'>No</span></td>
+            <td><span class="badge" style="background:#ef4444">High</span></td>
+        </tr></tbody>
+        </table>
+        </div>
+        <p class='truncate-note'>⚠ Showing first 200 results.</p>
+    </section>
+  
+    <section class="section">
+        <h2 class="section-title">
+            <span class="section-icon">🔐</span> Failed Login Attempts
+        </h2>
+        
+        <div class="warn-box">
+            ⚠ No auth log files found at standard paths (/var/log/auth.log, /var/log/secure).
+            This may be a container or a system using journald only.
+            Run: <code>journalctl _SYSTEMD_UNIT=sshd.service | grep "Failed"</code>
+        </div>
+        <div class="section-summary">
+            <div class="summary-pill pill-red">⚠ 0 Total Failures</div>
+            <div class="summary-pill pill-orange">🚨 0 Brute-Force IPs</div>
+            <div class="summary-pill pill-blue">👤 0 Unique Users</div>
+            <div class="summary-pill pill-gray">🌐 0 Unique IPs</div>
+        </div>
+
+        <div class="two-col">
+            <div>
+                <h3 class="sub-heading">Top Attacker IPs</h3>
+                <div class="table-wrap">
+                <table>
+                    <thead><tr><th>IP Address</th><th>Attempts</th><th>Count</th><th>Flag</th></tr></thead>
+                    <tbody><tr><td colspan='4' class='empty'>No data</td></tr></tbody>
+                </table>
+                </div>
+            </div>
+            <div>
+                <h3 class="sub-heading">Top Targeted Usernames</h3>
+                <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Username</th><th>Failed Attempts</th></tr></thead>
+                    <tbody><tr><td colspan='2' class='empty'>No data</td></tr></tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+
+        <h3 class="sub-heading">Recent Events (last 30)</h3>
+        <div class="table-wrap">
+        <table>
+            <thead><tr><th>Timestamp</th><th>User</th><th>Source IP</th><th>Raw Log</th></tr></thead>
+            <tbody><tr><td colspan='4' class='empty'>No recent events found.</td></tr></tbody>
+        </table>
+        </div>
+        
+    </section>
+
+  <div class="footer">
+    Generated by <strong>linux-audit</strong> · 2026-04-21 04:19:46 · Host: runsc
+  </div>
+</div>
+
+</body>
+</html>
